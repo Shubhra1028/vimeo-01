@@ -2,9 +2,19 @@ import React from "react";
 import "./styles.css";
 import TablePagination from "@material-ui/core/TablePagination";
 import CircularProgress from "@material-ui/core/CircularProgress";
+import TextField from "@material-ui/core/TextField";
 import Sort from "@material-ui/icons/Sort";
+import { MuiThemeProvider, createMuiTheme } from "@material-ui/core/styles";
 import axios from "axios";
 import Plot from "react-plotly.js";
+
+const theme = createMuiTheme({
+  palette: {
+    primary: {
+      main: "#16adbd"
+    }
+  }
+});
 
 export default class App extends React.Component {
   state = {
@@ -16,8 +26,10 @@ export default class App extends React.Component {
       "Balance AMT"
     ],
     data: null,
+    savedData: null,
     rowsPerPage: 10,
-    page: 0
+    page: 0,
+    recipient: ""
   };
 
   componentDidMount() {
@@ -26,7 +38,8 @@ export default class App extends React.Component {
       .get("https://cors-anywhere.herokuapp.com/" + url)
       .then(res => {
         this.setState({
-          data: res.data
+          data: res.data,
+          savedData: res.data
         });
       })
       .catch(error => console.error(error));
@@ -125,6 +138,30 @@ export default class App extends React.Component {
     });
   };
 
+  handleRecipient = event => {
+    this.setState(
+      {
+        recipient: event.target.value
+      },
+      () => {
+        if (this.state.recipient === "") {
+          this.setState({
+            data: this.state.savedData
+          });
+        } else {
+          let data = this.state.savedData.filter(transac =>
+            transac["Transaction Details"]
+              .toLowerCase()
+              .includes(this.state.recipient.toLowerCase())
+          );
+          this.setState({
+            data
+          });
+        }
+      }
+    );
+  };
+
   render() {
     const { rowsPerPage, page } = this.state;
     const width = window.innerWidth;
@@ -138,7 +175,16 @@ export default class App extends React.Component {
     return (
       <div className="App">
         <div className="accDet">
-          <p> Account No : {this.state.data[0]["Account No"]} </p>
+          <p> Account No : {this.state.savedData[0]["Account No"]} </p>
+          <MuiThemeProvider theme={theme}>
+            <TextField
+              label="Search Recipient"
+              value={this.state.recipient}
+              onChange={this.handleRecipient}
+              variant="outlined"
+              color="primary"
+            />
+          </MuiThemeProvider>
           <TablePagination
             rowsPerPageOptions={[5, 10, 25]}
             component="div"
@@ -149,37 +195,38 @@ export default class App extends React.Component {
             onChangeRowsPerPage={this.handleChangeRowsPerPage}
           />
         </div>
-        <Plot
-          data={[
-            {
-              // x: this.state.data.slice(rowsPerPage * page, rowsPerPage * (page+1)).map( val => val["Date"] ),
-              y: this.state.data
-                .slice(rowsPerPage * page, rowsPerPage * (page + 1))
-                .map(val => val["Balance AMT"]),
-              type: "lines",
-              mode: "lines+markers",
-              marker: { color: "#16adbd" }
-            }
-          ]}
-          layout={{
-            width:
-              width * 0.9 > 600
-                ? width * 0.9 >= 1100
-                  ? 1100
-                  : width * 0.9
-                : 600,
-            height: 400,
-            yaxis: {
-              rangemode: "normal",
-              autorange: "normal"
-            },
-            xaxis: {
-              rangemode: "normal",
-              autorange: "normal",
-              showticklabels: false
-            }
-          }}
-        />
+        {this.state.data.length > 0 ? (
+          <Plot
+            data={[
+              {
+                y: this.state.data
+                  .slice(rowsPerPage * page, rowsPerPage * (page + 1))
+                  .map(val => val["Balance AMT"]),
+                type: "lines",
+                mode: "lines+markers",
+                marker: { color: "#16adbd" }
+              }
+            ]}
+            layout={{
+              width:
+                width * 0.9 > 600
+                  ? width * 0.9 >= 1100
+                    ? 1100
+                    : width * 0.9
+                  : 600,
+              height: 400,
+              yaxis: {
+                rangemode: "normal",
+                autorange: "normal"
+              },
+              xaxis: {
+                rangemode: "normal",
+                autorange: "normal",
+                showticklabels: false
+              }
+            }}
+          />
+        ) : null}
         <table className="data">
           <thead>
             <tr>
@@ -202,7 +249,15 @@ export default class App extends React.Component {
               </td>
             </tr>
           </thead>
-          <tbody>{this.renderData()}</tbody>
+          <tbody>
+            {this.state.data.length > 0 ? (
+              this.renderData()
+            ) : (
+              <tr>
+                <td style={{ gridColumn: "1/6" }}> Recipient Not Found </td>
+              </tr>
+            )}
+          </tbody>
         </table>
       </div>
     );
